@@ -14,57 +14,12 @@
         if (!window.jQuery) {
             return;
         }
-        var $ = window.jQuery;
 
-        if (!$("#chatinput").length && $("#chatline").length) {
-            $("#chatline").wrap(
+        // Match the approach used by unimoji.js
+        if (!window.jQuery("#chatinput").length && window.jQuery("#chatline").length) {
+            window.jQuery("#chatline").wrap(
                 '<div onsubmit="return false" id="chatinput" class="input-group" style="width:100%">'
             );
-        }
-    }
-
-    function isPaused() {
-        try {
-            if (window.PLAYER && typeof window.PLAYER.paused === "boolean") {
-                return window.PLAYER.paused;
-            }
-            if (window.PLAYER && window.PLAYER.player) {
-                if (typeof window.PLAYER.player.paused === "function") {
-                    return !!window.PLAYER.player.paused();
-                }
-                if (typeof window.PLAYER.player.paused === "boolean") {
-                    return window.PLAYER.player.paused;
-                }
-            }
-        } catch (e) {
-            // ignored
-        }
-        return false;
-    }
-
-    function playOrPauseLocal() {
-        if (!window.PLAYER) {
-            return;
-        }
-
-        if (isPaused()) {
-            if (typeof window.PLAYER.play === "function") {
-                window.PLAYER.play();
-                return;
-            }
-            if (window.PLAYER.player && typeof window.PLAYER.player.play === "function") {
-                window.PLAYER.player.play();
-                return;
-            }
-            return;
-        }
-
-        if (typeof window.PLAYER.pause === "function") {
-            window.PLAYER.pause();
-            return;
-        }
-        if (window.PLAYER.player && typeof window.PLAYER.player.pause === "function") {
-            window.PLAYER.player.pause();
         }
     }
 
@@ -103,20 +58,18 @@
             return;
         }
 
-        var $ = window.jQuery;
-
-        if ($("#" + WRAP_ID).length) {
+        if (window.jQuery("#" + WRAP_ID).length) {
             return;
         }
 
         ensureChatInputGroup();
 
-        var wrap = $("<span/>")
+        var wrap = window.jQuery("<span/>")
             .attr("id", WRAP_ID)
             .addClass("input-group-btn")
             .hide();
 
-        var btn = $("<button/>")
+        var btn = window.jQuery("<button/>")
             .attr("id", BTN_ID)
             .attr("type", "button")
             .addClass("btn btn-sm btn-default")
@@ -161,46 +114,31 @@
 
         wrap.append(btn);
 
-        placeUi();
-    }
-
-    function placeUi() {
-        if (!window.jQuery) {
-            return;
-        }
-        var $ = window.jQuery;
-
-        var wrap = $("#" + WRAP_ID);
-        if (!wrap.length) {
-            return;
-        }
-
+        // Embed into the chat bar like unimoji.js
         ensureChatInputGroup();
-
-        // Desired: immediately to the right of the Emote List button.
-        var emoteBtn = $("#emotelistbtn");
-        if (emoteBtn.length) {
-            wrap.detach().insertAfter(emoteBtn);
-            return;
-        }
-
-        // Fallback: attach next to chatline inside the input-group.
-        var chatline = $("#chatline");
+        var chatline = window.jQuery("#chatline");
         if (chatline.length) {
-            wrap.detach().insertAfter(chatline);
-            return;
-        }
-
-        // Last resort
-        var form = $("#chatwrap form").first();
-        if (form.length) {
-            wrap.detach().insertAfter(form);
+            if (window.jQuery("#videowrap").prevAll().length) {
+                wrap.insertAfter(chatline);
+            } else {
+                wrap.insertBefore(chatline);
+            }
+        } else {
+            // Fallback: old placement under chat (should be rare)
+            var form = window.jQuery("#chatwrap form").first();
+            if (form.length) {
+                wrap.insertAfter(form);
+            } else {
+                window.jQuery("#chatwrap").append(wrap);
+            }
         }
     }
 
     function pauseAndBroadcast() {
         try {
-            playOrPauseLocal();
+            if (window.PLAYER && typeof window.PLAYER.pause === "function") {
+                window.PLAYER.pause();
+            }
         } finally {
             // Some player implementations already call sendVideoUpdate() on pause.
             // Calling it here is harmless and ensures the paused state is sent.
@@ -216,7 +154,7 @@
             return;
         }
 
-        placeUi();
+        ensureChatInputGroup();
 
         var wrap = window.jQuery("#" + WRAP_ID);
         if (!wrap.length) {
@@ -236,12 +174,7 @@
         }
 
         btn.prop("disabled", !(window.socket && window.PLAYER));
-
-        // Display play/pause symbol based on current state.
-        // Note: Clicking still follows the original behavior (take leader -> control playback;
-        // if already leader -> release leader).
-        btn.text(isPaused() ? "▶" : "⏸");
-        btn.attr("title", isPaused() ? "Play" : "Pause");
+        btn.text(window.CLIENT && window.CLIENT.leader ? "▶" : "⏸");
     }
 
     function hookSocket() {
