@@ -12,6 +12,7 @@
 
     var WRAP_ID = "emotelist-chatbarwrap";
     var ZFIX_STYLE_ID = "emotelist-modal-zfix-style";
+    var NO_BACKDROP_CLASS = "emotelist-nobackdrop";
 
     function viewportWidth() {
         return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
@@ -39,10 +40,63 @@
         tag.textContent = [
             // Cinema mode uses z-index 3000+ fixed panes; keep the modal above them.
             "body.cinemachat #emotelist.modal { z-index: 10050 !important; position: fixed !important; }",
-            // Simplest reliable fix: remove the backdrop in cinema mode so it can't cover the modal.
-            "body.cinemachat .modal-backdrop { display: none !important; }"
+            // Only suppress the backdrop for the Emote List modal (not other modals).
+            "body.cinemachat." + NO_BACKDROP_CLASS + " .modal-backdrop { display: none !important; }"
         ].join("\n");
         document.head.appendChild(tag);
+    }
+
+    function isCinemaMode() {
+        return document.body && document.body.classList && document.body.classList.contains("cinemachat");
+    }
+
+    function isEmoteListOpen($) {
+        var $m = $("#emotelist");
+        if (!$m.length) {
+            return false;
+        }
+        // Bootstrap 3 uses .in when shown
+        return $m.hasClass("in") || $m.is(":visible");
+    }
+
+    function addBackdropIfMissing($) {
+        // If a modal is open but we previously removed backdrops (cinema mode),
+        // Bootstrap won't recreate it automatically.
+        if ($(".modal-backdrop").length) {
+            return;
+        }
+
+        var h = 0;
+        try {
+            h = Math.max(
+                document.body ? document.body.scrollHeight : 0,
+                document.documentElement ? document.documentElement.scrollHeight : 0,
+                window.innerHeight || 0
+            );
+        } catch (e) {
+            h = window.innerHeight || 0;
+        }
+
+        $("<div/>")
+            .addClass("modal-backdrop fade in")
+            .css("height", h + "px")
+            .appendTo("body");
+    }
+
+    function syncBackdropForMode($) {
+        if (!document.body) {
+            return;
+        }
+
+        if (isCinemaMode() && isEmoteListOpen($)) {
+            document.body.classList.add(NO_BACKDROP_CLASS);
+            $(".modal-backdrop").remove();
+        } else {
+            document.body.classList.remove(NO_BACKDROP_CLASS);
+            if (isEmoteListOpen($)) {
+                addBackdropIfMissing($);
+            }
+        }
     }
 
     function hookEmoteListModalStacking() {
@@ -61,7 +115,7 @@
         }
         window.__emoteListAttachChatbarModalHooked = true;
 
-        // In cinema mode, disable/remove the backdrop so it can't steal clicks.
+        // In cinema mode, suppress the backdrop for Emote List so it can't steal clicks.
         $modal.on("show.bs.modal", function () {
             try {
                 var $m = $(this);
@@ -69,11 +123,17 @@
                     $m.appendTo("body");
                 }
 
-                if ($("body").hasClass("cinemachat")) {
-                    var inst = $m.data("bs.modal");
+                var inst = $m.data("bs.modal");
+                if (isCinemaMode()) {
                     if (inst && inst.options) {
                         inst.options.backdrop = false;
                     }
+                    document.body.classList.add(NO_BACKDROP_CLASS);
+                } else {
+                    if (inst && inst.options) {
+                        inst.options.backdrop = true;
+                    }
+                    document.body.classList.remove(NO_BACKDROP_CLASS);
                 }
             } catch (e) {
                 // ignored
@@ -82,15 +142,44 @@
 
         $modal.on("shown.bs.modal", function () {
             try {
-                if ($("body").hasClass("cinemachat")) {
+                if (isCinemaMode()) {
                     $(this).css("z-index", "10050");
-                    // If Bootstrap already inserted a backdrop, remove it.
-                    $(".modal-backdrop").remove();
+                }
+
+                // Enforce correct backdrop behavior for current mode.
+                syncBackdropForMode($);
+            } catch (e) {
+                // ignored
+            }
+        });
+
+        $modal.on("hidden.bs.modal", function () {
+            try {
+                // Clean up any forced styles/classes.
+                $(this).css("z-index", "");
+                if (document.body) {
+                    document.body.classList.remove(NO_BACKDROP_CLASS);
                 }
             } catch (e) {
                 // ignored
             }
         });
+
+        // Watch for cinema mode toggling while the modal is open.
+        try {
+            if (typeof MutationObserver === "function" && document.body) {
+                var mo = new MutationObserver(function (records) {
+                    records.forEach(function (rec) {
+                        if (rec.type === "attributes" && rec.attributeName === "class") {
+                            syncBackdropForMode($);
+                        }
+                    });
+                });
+                mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+            }
+        } catch (e) {
+            // ignored
+        }
     }
 
     function moveToChatbar($) {
