@@ -690,12 +690,13 @@
             panel.toggle();
         });
 
-        // Put the toggle button next to the Emote List button.
+        // Put the toggle button in left controls.
+        // (The Emote List button may be moved into the chat bar by other scripts.)
         // Keep the panel itself under chat for a predictable layout.
-        var emoteBtn = window.jQuery("#emotelistbtn");
-        if (emoteBtn.length) {
+        var left = window.jQuery("#leftcontrols");
+        if (left.length) {
             toggle.removeClass("btn-block");
-            toggle.insertAfter(emoteBtn);
+            left.append(toggle);
         } else {
             // Fallback: old behavior if layout differs
             var chatForm = window.jQuery("#chatwrap form").first();
