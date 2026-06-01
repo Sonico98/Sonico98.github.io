@@ -122,6 +122,10 @@
         // Keep it small even when attached to the input-group
         $btn.addClass("btn").addClass("btn-sm");
 
+        // Important: the chat input is inside a <form>. If this <button> is inside the form
+        // and has no explicit type, it defaults to type="submit" and can be triggered by Enter.
+        $btn.attr("type", "button");
+
         return true;
     }
 
