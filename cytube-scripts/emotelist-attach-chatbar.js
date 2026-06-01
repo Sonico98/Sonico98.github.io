@@ -37,8 +37,10 @@
         tag.type = "text/css";
         tag.id = ZFIX_STYLE_ID;
         tag.textContent = [
-            "body.cinemachat #emotelist.modal { z-index: 10050 !important; }",
-            "body.cinemachat .modal-backdrop { z-index: 10040 !important; }"
+            "body.cinemachat #emotelist.modal { z-index: 10090 !important; }",
+            "body.cinemachat .modal-backdrop { z-index: 10080 !important; }"
+            "body.cinemachat .modal-backdrop.fade.in { z-index: 10070 !important; }"
+            "body.cinemachat .modal-backdrop.fade { z-index: 10060 !important; }"
         ].join("\n");
         document.head.appendChild(tag);
     }
