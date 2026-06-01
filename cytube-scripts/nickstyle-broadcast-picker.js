@@ -15,8 +15,12 @@
     var CONTROL_PREFIX = "##nickstyle:";
     var CONTROL_REQ = "##nickstyle?";
 
+    var CSS_BLOCK_BEGIN = "/* nickstyle-autosave BEGIN */";
+    var CSS_BLOCK_END = "/* nickstyle-autosave END */";
+
     var stylesByUser = Object.create(null);
     var lastReqReply = 0;
+    var persistCssTimer = null;
 
     function now() {
         return Date.now();
@@ -34,6 +38,111 @@
     function canUse() {
         // Allow guests too, as long as they have a name
         return !!getSelfName();
+    }
+
+    function canPersistToChannelCss() {
+        // CyTube server permission: setChannelCSS is rank>=3 (Admin)
+        return !!(window.socket && window.CLIENT && window.Rank &&
+            typeof window.CLIENT.rank === "number" &&
+            window.CLIENT.rank >= window.Rank.Admin);
+    }
+
+    function stripPersistBlock(css) {
+        if (typeof css !== "string") {
+            return "";
+        }
+
+        var re = new RegExp(
+            "\\/\\*\\s*nickstyle-autosave BEGIN\\s*\\*\\/[\\s\\S]*?\\/\\*\\s*nickstyle-autosave END\\s*\\*\\/",
+            "g"
+        );
+        return css.replace(re, "").trim();
+    }
+
+    function buildPersistBlock() {
+        var css = [];
+
+        // Store a compact JSON snapshot for clients to rehydrate stylesByUser on load.
+        // If this gets too large, skip it (channel CSS is capped server-side).
+        try {
+            var snapshot = JSON.stringify(stylesByUser);
+            if (snapshot.length <= 8000) {
+                css.push("/* nickstyle-autosave DATA: " + snapshot + " */");
+            }
+        } catch (e) {
+            // ignored
+        }
+
+        Object.keys(stylesByUser).forEach(function (name) {
+            var st = stylesByUser[name];
+            var decl = cssForStyle(st);
+            if (!decl) {
+                return;
+            }
+
+            // Userlist: some deployments add a per-user class like userlist-<name>
+            // (as in the user's existing channel CSS). If not present, the JS
+            // path still styles the userlist for clients running the script.
+            css.push("span.userlist-" + name + " { " + decl + " }");
+
+            // Chat: support both raw and selector-escaped variants
+            var safe = safeUsernameForSelector(name);
+            css.push(".chat-msg-" + name + " strong.username { " + decl + " }");
+            css.push(".chat-msg-" + safe + " strong.username { " + decl + " }");
+        });
+
+        return [CSS_BLOCK_BEGIN, css.join("\n"), CSS_BLOCK_END].join("\n");
+    }
+
+    function schedulePersistToChannelCss() {
+        if (!canPersistToChannelCss()) {
+            return;
+        }
+
+        if (persistCssTimer) {
+            clearTimeout(persistCssTimer);
+        }
+
+        // Debounce to avoid spamming updates during rapid changes
+        persistCssTimer = setTimeout(function () {
+            persistCssTimer = null;
+
+            var current = (window.CHANNEL && typeof window.CHANNEL.css === "string") ? window.CHANNEL.css : "";
+            var base = stripPersistBlock(current);
+            var next = (base ? base + "\n\n" : "") + buildPersistBlock() + "\n";
+
+            try {
+                window.socket.emit("setChannelCSS", { css: next });
+            } catch (e) {
+                // ignored
+            }
+        }, 1200);
+    }
+
+    function tryHydrateFromChannelCss() {
+        var css = (window.CHANNEL && typeof window.CHANNEL.css === "string") ? window.CHANNEL.css : "";
+        if (!css) {
+            return;
+        }
+
+        var m = css.match(/\/\*\s*nickstyle-autosave DATA:\s*([\s\S]*?)\s*\*\//);
+        if (!m) {
+            return;
+        }
+
+        try {
+            var data = JSON.parse(m[1]);
+            if (data && typeof data === "object") {
+                Object.keys(data).forEach(function (name) {
+                    var st = normalizeStyle(data[name]);
+                    if (st) {
+                        stylesByUser[name] = st;
+                    }
+                });
+            }
+        } catch (e) {
+            // ignored
+        }
     }
 
     function isValidHexColor(str) {
@@ -273,6 +382,10 @@
 
         rebuildChatCss();
         applyUserlistStyle(name, style || null);
+
+        // If an Admin+ is present, persist this change to channel CSS so
+        // late joiners see it without needing a re-broadcast.
+        schedulePersistToChannelCss();
     }
 
     function handleIncomingChatMsg(data) {
@@ -597,6 +710,9 @@
 
         hookCallbacks();
         hookUserlistRefresh();
+
+        // Load any persisted styles from channel CSS (if present)
+        tryHydrateFromChannelCss();
 
         // Wait for chat DOM
         var tries = 0;
