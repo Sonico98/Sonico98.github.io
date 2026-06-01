@@ -38,6 +38,11 @@
         tag.id = ZFIX_STYLE_ID;
         tag.textContent = [
             "body.cinemachat #emotelist.modal { z-index: 10050 !important; }",
+            "body.cinemachat #emotelist.modal { position: fixed !important; }",
+            "body.cinemachat #emotelist.modal, body.cinemachat #emotelist.modal * { pointer-events: auto !important; }",
+            // This CyTube Bootstrap theme uses absolute backdrops; cinema mode uses fixed full-screen panes.
+            // Make the backdrop fixed so it consistently covers the viewport behind the modal.
+            "body.cinemachat .modal-backdrop { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; height: auto !important; }",
             "body.cinemachat .modal-backdrop { z-index: 10040 !important; }"
         ].join("\n");
         document.head.appendChild(tag);
@@ -81,6 +86,8 @@
                     $(this).css("z-index", "10050");
                     if ($backdrop.length) {
                         $backdrop.css("z-index", "10040");
+                        // Ensure DOM order can't put the backdrop above the modal
+                        $backdrop.after($(this));
                     }
                 }
             } catch (e) {
