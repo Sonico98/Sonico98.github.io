@@ -43,6 +43,52 @@
         document.head.appendChild(tag);
     }
 
+    function hookEmoteListModalStacking() {
+        if (!window.jQuery) {
+            return;
+        }
+
+        var $ = window.jQuery;
+        var $modal = $("#emotelist");
+        if (!$modal.length || !$modal.on) {
+            return;
+        }
+
+        if (window.__emoteListAttachChatbarModalHooked) {
+            return;
+        }
+        window.__emoteListAttachChatbarModalHooked = true;
+
+        // Bootstrap appends the backdrop to <body>. Some layouts/CSS can cause
+        // the modal (inside #wrap) to be in a different stacking context.
+        // Re-parent the modal into <body> and explicitly order z-index.
+        $modal.on("show.bs.modal", function () {
+            try {
+                var $m = $(this);
+                if (!$m.parent().is("body")) {
+                    $m.appendTo("body");
+                }
+            } catch (e) {
+                // ignored
+            }
+        });
+
+        $modal.on("shown.bs.modal", function () {
+            try {
+                // Ensure the most recently-added backdrop sits behind the modal
+                var $backdrop = $(".modal-backdrop").last();
+                if ($("body").hasClass("cinemachat")) {
+                    $(this).css("z-index", "10050");
+                    if ($backdrop.length) {
+                        $backdrop.css("z-index", "10040");
+                    }
+                }
+            } catch (e) {
+                // ignored
+            }
+        });
+    }
+
     function moveToChatbar($) {
         var $btn = $("#emotelistbtn");
         var $chatline = $("#chatline");
@@ -116,6 +162,7 @@
 
     function init() {
         ensureModalZFixStyle();
+        hookEmoteListModalStacking();
 
         var tries = 0;
         var boot = setInterval(function () {
