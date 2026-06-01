@@ -11,6 +11,7 @@
     window.__emoteListAttachChatbarInstalled = true;
 
     var WRAP_ID = "emotelist-chatbarwrap";
+    var ZFIX_STYLE_ID = "emotelist-modal-zfix-style";
 
     function viewportWidth() {
         return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
@@ -23,6 +24,23 @@
                 '<div onsubmit="return false" id="chatinput" class="input-group" style="width:100%">'
             );
         }
+    }
+
+    function ensureModalZFixStyle() {
+        if (document.getElementById(ZFIX_STYLE_ID)) {
+            return;
+        }
+
+        // Bootstrap modals default to z-index ~1050, but cinema mode uses z-index 3000+.
+        // Ensure the Emote List modal always renders on top.
+        var tag = document.createElement("style");
+        tag.type = "text/css";
+        tag.id = ZFIX_STYLE_ID;
+        tag.textContent = [
+            "body.cinemachat #emotelist.modal { z-index: 10050 !important; }",
+            "body.cinemachat .modal-backdrop { z-index: 10040 !important; }"
+        ].join("\n");
+        document.head.appendChild(tag);
     }
 
     function moveToChatbar($) {
@@ -97,6 +115,8 @@
     }
 
     function init() {
+        ensureModalZFixStyle();
+
         var tries = 0;
         var boot = setInterval(function () {
             tries++;
