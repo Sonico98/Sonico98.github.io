@@ -11,6 +11,8 @@
 
     var WRAP_ID = "nickstyle-broadcast-picker";
     var STYLE_ID = "nickstyle-broadcast-style";
+    var TOGGLE_ID = "nickstyle-broadcast-toggle";
+    var PANEL_ID = "nickstyle-broadcast-panel";
 
     var CONTROL_PREFIX = "##nickstyle:";
     var CONTROL_REQ = "##nickstyle?";
@@ -485,7 +487,7 @@
             return;
         }
 
-        if (window.jQuery("#" + WRAP_ID).length) {
+        if (window.jQuery("#" + WRAP_ID).length || window.jQuery("#" + TOGGLE_ID).length) {
             return;
         }
 
@@ -496,10 +498,13 @@
 
         var toggle = window.jQuery("<button/>")
             .attr("type", "button")
+            .attr("id", TOGGLE_ID)
             .addClass("btn btn-sm btn-default btn-block")
             .text("Name style");
 
-        var panel = window.jQuery("<div/>").hide();
+        var panel = window.jQuery("<div/>")
+            .attr("id", PANEL_ID)
+            .hide();
 
         function colorRow(label, idPrefix) {
             var row = window.jQuery("<div/>")
@@ -596,6 +601,14 @@
             window.jQuery(document).on("change", "#" + p + "-hex", function () {
                 syncPickerFromHex(p);
             });
+
+            // When changing the picker, update the adjacent hex textbox
+            window.jQuery(document).on("input change", "#" + p + "-picker", function () {
+                var v = window.jQuery("#" + p + "-picker").val();
+                if (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v)) {
+                    window.jQuery("#" + p + "-hex").val(v);
+                }
+            });
         });
 
         function populate(style) {
@@ -677,11 +690,27 @@
             panel.toggle();
         });
 
-        wrap.append(toggle).append(panel);
+        // Put the toggle button next to the Emote List button.
+        // Keep the panel itself under chat for a predictable layout.
+        var emoteBtn = window.jQuery("#emotelistbtn");
+        if (emoteBtn.length) {
+            toggle.removeClass("btn-block");
+            toggle.insertAfter(emoteBtn);
+        } else {
+            // Fallback: old behavior if layout differs
+            var chatForm = window.jQuery("#chatwrap form").first();
+            if (chatForm.length) {
+                toggle.insertAfter(chatForm);
+            } else {
+                window.jQuery("#chatwrap").append(toggle);
+            }
+        }
 
-        var chatForm = window.jQuery("#chatwrap form").first();
-        if (chatForm.length) {
-            wrap.insertAfter(chatForm);
+        wrap.append(panel);
+
+        var chatForm2 = window.jQuery("#chatwrap form").first();
+        if (chatForm2.length) {
+            wrap.insertAfter(chatForm2);
         } else {
             window.jQuery("#chatwrap").append(wrap);
         }
@@ -696,11 +725,20 @@
         }
 
         var wrap = window.jQuery("#" + WRAP_ID);
-        if (!wrap.length) {
-            return;
+        var toggle = window.jQuery("#" + TOGGLE_ID);
+        var ok = !!canUse();
+
+        if (wrap.length) {
+            wrap.toggle(ok);
         }
 
-        wrap.toggle(!!canUse());
+        if (toggle.length) {
+            toggle.toggle(ok);
+        }
+
+        if (!ok) {
+            window.jQuery("#" + PANEL_ID).hide();
+        }
     }
 
     function init() {
